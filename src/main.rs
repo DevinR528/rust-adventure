@@ -1,5 +1,6 @@
 use ::rust_adventure::{serialize_all_questions, start_adventure};
 
 fn main() {
-    serialize_all_questions().expect("whaaat");
+    // serialize_all_questions().expect("whaaat");
+    start_adventure().expect("whaaat");
 }

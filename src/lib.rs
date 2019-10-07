@@ -6,9 +6,10 @@ use std::fs;
 use std::io::{self, Write};
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
+use std::string::ToString;
 
-use console::{Color, Term};
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
+use console::{ style, Term};
+use flate2::{ write::GzEncoder, Compression};
 
 use trybuild;
 
@@ -36,6 +37,8 @@ pub fn serialize_all_questions() -> io::Result<()> {
 }
 
 fn write_new_question<T: serde::Serialize, P: AsRef<Path>>(file: P, item: T) -> io::Result<()> {
+    let f = file.as_ref().file_name().unwrap().to_str().unwrap();
+    let file_name = format!("{}.gz", f);
     let mut path = PathBuf::from(file.as_ref());
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -44,46 +47,50 @@ fn write_new_question<T: serde::Serialize, P: AsRef<Path>>(file: P, item: T) -> 
     encoder.write_all(b"\n")?;
     let gz = encoder.finish()?;
 
+    path.pop();
+    path.pop();
 
-    println!("{:?}", path);
-    fs::write(file, gz)?;
+    path.push("questions_ser");
+
+    fs::DirBuilder::new()
+            .recursive(true)
+            .create(&path)?;
+
+    path.push(file_name);
+    fs::write(path, gz)?;
     Ok(())
 }
 
 pub fn start_adventure() -> io::Result<()> {
-    let try_test = trybuild::TestCases::new();
-
     let mut dir = env::current_dir()?;
-    dir.push("questions");
+    dir.push("questions_ser");
     let term = Term::stdout();
 
     for (idx, q) in QUESTIONS.iter().enumerate() {
         let mut test_pass: Result<(), Box<(dyn Any + Send)>> = Err(Box::new(0));
+        // add then file name
+        dir.push(format!("{}.gz", q));
+        let q_builder = ques::QuestionHolder::new(&dir)?;
+
+        fs::DirBuilder::new()
+            .recursive(true)
+            .create(q_builder.folder().expect("DirBuilder failed, no parent in paht"))?;
+        let mut start_file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&q_builder.location())?;
+        start_file.write_all(&q_builder.to_bytes())?;
 
         while let Err(_) = test_pass {
-            // add then file name
-            dir.push(q);
-            let q_builder = ques::QuestionHolder::new(&dir)?;
-
-            fs::DirBuilder::new()
-                .recursive(true)
-                .create(q_builder.folder().expect("DirBuilder failed, no parent in paht"))?;
-
-            let mut start_file = fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(&q_builder.location())?;
-
-            start_file.write_all(&q_builder.to_bytes())?;
-
-            term.write_line("Hit Enter when you are ready to try solution out.")?;
+            term.write_line(&format!("{}", style("\nHit Enter when you are ready to try solution out.").cyan()))?;
             term.read_line()?;
 
             test_pass = panic::catch_unwind(AssertUnwindSafe(|| {
+                let try_test = trybuild::TestCases::new();
                 try_test.pass(q_builder.location());
             }));
-            term.clear_screen()?;
+            //term.clear_screen()?;
         }
         // remove file name
         dir.pop();
@@ -94,11 +101,3 @@ pub fn start_adventure() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn it_works() {
-        start_adventure();
-    }
-}
