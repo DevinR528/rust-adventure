@@ -24,7 +24,10 @@ impl QuestionHolder {
         Ok(this)
     }
     pub(crate) fn build<P: AsRef<Path>>(question: String, ans_loc: P) -> Self {
-        let file_name = ans_loc.as_ref().file_name().expect("build QuestionHolder failed no file_name");
+        let file_name = ans_loc
+            .as_ref()
+            .file_name()
+            .expect("build QuestionHolder failed no file_name");
         let mut ans_loc = PathBuf::from(ans_loc.as_ref());
         // remove file name then question folder
         ans_loc.pop();

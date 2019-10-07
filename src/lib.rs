@@ -6,10 +6,9 @@ use std::fs;
 use std::io::{self, Write};
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
-use std::string::ToString;
 
-use console::{ style, Term};
-use flate2::{ write::GzEncoder, Compression};
+use console::{style, Term};
+use flate2::{write::GzEncoder, Compression};
 
 use trybuild;
 
@@ -52,9 +51,7 @@ fn write_new_question<T: serde::Serialize, P: AsRef<Path>>(file: P, item: T) -> 
 
     path.push("questions_ser");
 
-    fs::DirBuilder::new()
-            .recursive(true)
-            .create(&path)?;
+    fs::DirBuilder::new().recursive(true).create(&path)?;
 
     path.push(file_name);
     fs::write(path, gz)?;
@@ -72,9 +69,11 @@ pub fn start_adventure() -> io::Result<()> {
         dir.push(format!("{}.gz", q));
         let q_builder = ques::QuestionHolder::new(&dir)?;
 
-        fs::DirBuilder::new()
-            .recursive(true)
-            .create(q_builder.folder().expect("DirBuilder failed, no parent in paht"))?;
+        fs::DirBuilder::new().recursive(true).create(
+            q_builder
+                .folder()
+                .expect("DirBuilder failed, no parent in paht"),
+        )?;
         let mut start_file = fs::OpenOptions::new()
             .create(true)
             .write(true)
@@ -83,21 +82,28 @@ pub fn start_adventure() -> io::Result<()> {
         start_file.write_all(&q_builder.to_bytes())?;
 
         while let Err(_) = test_pass {
-            term.write_line(&format!("{}", style("\nHit Enter when you are ready to try solution out.").cyan()))?;
+            let msg = format!(
+                "{}",
+                style("\nHit Enter when you are ready to try solution out.").cyan()
+            );
+            term.write_line(&msg)?;
             term.read_line()?;
 
             test_pass = panic::catch_unwind(AssertUnwindSafe(|| {
                 let try_test = trybuild::TestCases::new();
                 try_test.pass(q_builder.location());
             }));
-            //term.clear_screen()?;
         }
-        // remove file name
+        // remove file name and delete so user cant go back while working on current file
         dir.pop();
+        fs::remove_file(q_builder.location())?;
+
+        // term.clear_screen()?;
+
+        
 
         term.write_line(MSGS[idx])?;
     }
 
     Ok(())
 }
-
