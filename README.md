@@ -13,7 +13,8 @@ cargo run
   editor and fix all issues.
 
 - Once you have solved the problem type the name of the file you would like the
-  compiler to check for you.
+  compiler to check for you. When the file compiles you will move on to the next
+  challenge.
 
 - TODO add some sort of "prize" for completing all levels.
 
