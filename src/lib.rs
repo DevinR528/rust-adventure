@@ -12,8 +12,6 @@ use flate2::{write::GzEncoder, Compression, read::GzDecoder};
 
 use trybuild;
 
-mod ques;
-
 const QUESTIONS: &[&str] = &["first.rs", "second.rs", "third.rs", "fourth.rs"];
 const MSGS: &[&str] = &[
     "Great job, on to invariance, covariance and contravariance!! just kidding",
