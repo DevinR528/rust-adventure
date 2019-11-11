@@ -15,9 +15,8 @@ struct TestStruct<'a> {
 }
 
 impl<'a> TestStruct<'a> {
-    fn into_owned<'b>(self) -> TestStruct<'b> 
-    where
-        'a: 'b
+    fn into_owned(self) -> TestStruct 
+    // where clause may be helpful
     {
         let Self {
             e,
