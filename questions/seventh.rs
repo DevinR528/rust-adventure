@@ -1,16 +1,95 @@
-// https://users.rust-lang.org/t/lifetime-problem-with-curried-function/34146
-// A rarely used feature of rusts lifetime system is `impl for<'a> Fn(&'a _)`
-// almost always used with functions.
-fn foo<'b>(a: &'b str, b: &'b str) -> &'b str {
-    print!("{}", a);
-    b
+// This is stolen from https://github.com/llogiq/compact_arena
+// because I think its really cool to see some of the things that
+// can be done with lifetimes. This one almost compiles we
+// just have to add a way to store each `Container`'s "id lifetime"
+// making it's keys/indexes completely unique.
+
+// Here's a big hint
+use std::marker::PhantomData;
+
+#[derive(Copy, Clone, PartialEq, PartialOrd, Eq)]
+pub struct Lifetime<>(/* something */);
+
+#[allow(dead_code)]
+pub fn make_invariant<>() -> Lifetime<> {
+    Lifetime(/* something */)
 }
 
-fn bar<'a>() -> impl for<'b> Fn(&'b str) -> &'b str + 'a {
-    move |b| foo("hey", b)
+#[derive(Copy, Clone, PartialEq, PartialOrd, Eq)]
+pub struct IdxID<'id> {
+    idx: usize,
+    _id: Lifetime<'id>,
 }
-#[test]
-fn main2() {
-    let x = bar();
-    println!("{}", x(" you"));
+
+pub struct Container<'id, T> {
+    _id: Lifetime<'id>,
+    items: Vec<T>,
+}
+
+impl<'c, T> Container<'c, T> {
+    #[allow(dead_code)]
+    pub fn new(id: Lifetime<'c>) -> Container<'c, T> {
+        
+        Self {
+            _id: id,
+            items: Vec::new(),
+        }
+    }
+    #[allow(dead_code)]
+    pub fn push(&mut self, item: T) -> IdxID<'c> {
+        let idx = self.items.len();
+        self.items.push(item);
+
+        IdxID {
+            idx,
+            _id: self._id,
+        }
+    }
+    #[allow(dead_code)]
+    pub fn get(&self, i: IdxID<'c>) -> Option<&T> {
+        self.items.get(i.idx)
+    }
+}
+
+#[macro_export]
+macro_rules! make_container {
+    ($name:ident) => {
+        let id = make_invariant();
+        let _guard;
+
+        let mut $name = Container::new(id);
+
+        // this is compiled away but the borrow checker uses it to prevent
+        // lifetimes created in the same scope from being unified 
+        // (evaluated/resolved as the same lifetime).
+        if false {
+            struct Guard<'g>(&'g Lifetime<'g>);
+            impl<'g> Drop for Guard<'g> {
+                fn drop(&mut self) {}
+            }
+            _guard = Guard(&id);
+        }
+    };
+}
+
+fn main() {
+    make_container!(arena_a);
+    let i_1a = arena_a.push(0_usize);
+    let i_2a = arena_a.push(1);
+
+    make_container!(arena_b);
+    let i_1b = arena_b.push(2_usize);
+    let i_2b = arena_b.push(3);
+
+    println!("{:?}", arena_a.get(i_1a));
+    println!("{:?}", arena_b.get(i_2b));
+
+    println!("{:?}", arena_b.get(i_1b));
+    println!("{:?}", arena_a.get(i_2a));
+
+    // println!("{:?}", arena_a.get(i_2b));
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    // this fails because each `Container` has a unique lifetime attached to it
+    // because of our `make_invariant` function which is enforced by the 
+    // `Guard` `Drop` trait we implemented
 }

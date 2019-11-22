@@ -1,40 +1,37 @@
-// https://users.rust-lang.org/t/match-on-enum-where-a-variant-holds-a-cowed-slice/34123
+// https://users.rust-lang.org/t/lifetime-problem-with-curried-function/34146
+// A rarely used feature of rusts lifetime system is `impl for<'a> Foo`
+// almost always used with functions. The link below is somewhat helpful
+// https://doc.rust-lang.org/beta/nomicon/hrtb.html there just isn't a lot
+// of info.
 
-use std::borrow::Cow;
-
-#[derive(Debug)]
-enum TestEnum<'a> {
-    Variant1,
-    Variant2(Cow<'a, [u8]>),
-    Variant3,
+// Here is an example
+trait SomeTrait<'a> {
+    fn call_me(x: &'a str) -> Self;
 }
-
-#[derive(Debug)]
-struct TestStruct<'a> {
-    e: TestEnum<'a>,
-}
-
-impl<'a> TestStruct<'a> {
-    fn into_owned(self) -> TestStruct 
-    // where clause may be helpful
-    {
-        let Self {
-            e,
-        } = self;
-        match e {
-            TestEnum::Variant2(data) => TestStruct {
-                e: TestEnum::Variant2(data.into_owned().into()),
-            },
-            e @ _ => TestStruct {
-                e,
-            },
-        }
+impl<'a> SomeTrait<'a> for () {
+    fn call_me(x: &'a str) -> Self {
+        println!("{}", x);
+        ()
     }
 }
+fn fooo<'a>(x: &'a str) -> impl for<'b> SomeTrait<'b> {
+    let res: () = SomeTrait::call_me("helo");
+    res
+}
 
-fn main() {
-    let s = TestStruct {
-        e: TestEnum::Variant2((&b"Hello world!"[..]).into()),
-    };
-    println!("{:?}", s.into_owned());
+// NOW FOR THE PROBLEM
+fn foo(a: &str, b: &str) -> &str {
+    print!("{}", a);
+    b
+}
+
+fn bar() -> impl Fn(&str) -> &str {
+    move |b| foo("hey", b)
+}
+
+
+#[test]
+fn main2() {
+    let func = bar();
+    println!("{}", func(" you"));
 }
